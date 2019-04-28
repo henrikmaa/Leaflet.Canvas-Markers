@@ -375,7 +375,7 @@ function layerFactory(L) {
             for (var i = 0; i < keys.length; i++) {
                 if (groupID === keys[0]) {
                     var add = true;
-                    greak;
+                    break;
                 }
             }
             if (!add)
@@ -564,7 +564,7 @@ function layerFactory(L) {
 
             var adj_x = iconSize[0] / 2;
             var adj_y = iconSize[1] / 2;
-			var anchor_y =
+
             var ret = [({
                 minX: (pointPos.x - adj_x),
                 minY: (pointPos.y - adj_y),

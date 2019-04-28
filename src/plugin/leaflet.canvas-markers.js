@@ -529,8 +529,10 @@ function layerFactory(L) {
         },
         _removeGeneric: function (val, compareFn)
         {
-            this._latlngMarkers.remove(val, compareFn);
-            this._latlngMarkers.total--;
+            if (this._latlngMarkers) {
+                this._latlngMarkers.remove(val, compareFn);
+                this._latlngMarkers.total--;
+            }
         },
         addTo: function (map) {
             map.addLayer(this);

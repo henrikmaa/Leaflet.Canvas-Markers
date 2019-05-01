@@ -278,6 +278,8 @@ function layerFactory(L) {
             return this;
         },
         _onClick: function (e) {
+            if (!this._markers) { return; }
+
             var self = this;
             var point = e.containerPoint;
 
@@ -298,7 +300,7 @@ function layerFactory(L) {
             }
         },
         _onMouseMove: function (e) {
-            if (!this._map || this._map.dragging.moving() || this._map._animatingZoom) { return; }
+            if (!this._markers || this._map.dragging.moving() || this._map._animatingZoom) { return; }
 
             var point = e.containerPoint;
             this._handleMouseHover(e, point);

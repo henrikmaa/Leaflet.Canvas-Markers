@@ -521,7 +521,7 @@ function layerFactory(L) {
                 data: marker
             };
 
-            this._removeGeneric(marker, fn);
+            this._removeGeneric(val, fn);
 
             if (isDisplaying === true && redraw === true) {
                 self._redraw();

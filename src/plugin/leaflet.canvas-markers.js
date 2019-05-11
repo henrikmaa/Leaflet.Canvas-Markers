@@ -514,7 +514,7 @@ function layerFactory(L) {
             if (marker["minX"])
                 marker = marker.data;
             var latlng = marker.getLatLng();
-            var isDisplaying = self._map.getBounds().contains(latlng);
+            var isDisplaying = self._map && self._map.getBounds().contains(latlng);
             var val = {
                 minX: latlng.lng,
                 minY: latlng.lat,

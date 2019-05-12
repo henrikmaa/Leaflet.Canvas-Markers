@@ -245,7 +245,7 @@ function layerFactory(L) {
                         });
                     }
                 }
-            } else {
+            } else if (self._imageLookup[marker.options.icon.options.iconUrl][1]) { // image may be not loaded / bad url
                 self._drawImage(marker, pointPos);
             }
         },

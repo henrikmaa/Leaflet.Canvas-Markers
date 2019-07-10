@@ -245,7 +245,7 @@ function layerFactory(L) {
                         });
                     }
                 }
-            } else {
+            } else if (self._imageLookup[marker.options.icon.options.iconUrl][1]) { // image may be not loaded / bad url
                 self._drawImage(marker, pointPos);
             }
         },
@@ -278,6 +278,8 @@ function layerFactory(L) {
             return this;
         },
         _onClick: function (e) {
+            if (!this._markers) { return; }
+
             var self = this;
             var point = e.containerPoint;
 
@@ -298,7 +300,7 @@ function layerFactory(L) {
             }
         },
         _onMouseMove: function (e) {
-            if (!this._map || this._map.dragging.moving() || this._map._animatingZoom) { return; }
+            if (!this._markers || this._map.dragging.moving() || this._map._animatingZoom) { return; }
 
             var point = e.containerPoint;
             this._handleMouseHover(e, point);
@@ -375,7 +377,7 @@ function layerFactory(L) {
             for (var i = 0; i < keys.length; i++) {
                 if (groupID === keys[0]) {
                     var add = true;
-                    greak;
+                    break;
                 }
             }
             if (!add)
@@ -512,7 +514,7 @@ function layerFactory(L) {
             if (marker["minX"])
                 marker = marker.data;
             var latlng = marker.getLatLng();
-            var isDisplaying = self._map.getBounds().contains(latlng);
+            var isDisplaying = self._map && self._map.getBounds().contains(latlng);
             var val = {
                 minX: latlng.lng,
                 minY: latlng.lat,
@@ -521,7 +523,7 @@ function layerFactory(L) {
                 data: marker
             };
 
-            this._removeGeneric(marker, fn);
+            this._removeGeneric(val, fn);
 
             if (isDisplaying === true && redraw === true) {
                 self._redraw();
@@ -564,7 +566,7 @@ function layerFactory(L) {
 
             var adj_x = iconSize[0] / 2;
             var adj_y = iconSize[1] / 2;
-			var anchor_y =
+
             var ret = [({
                 minX: (pointPos.x - adj_x),
                 minY: (pointPos.y - adj_y),

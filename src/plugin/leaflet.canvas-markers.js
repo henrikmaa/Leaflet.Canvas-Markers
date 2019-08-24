@@ -26,28 +26,28 @@ function layerFactory(L) {
         onRemove: function () {
             this._destroyContainer();
         },
+        getEvents: function () {
+            var events = {
+                viewreset: this._reset,
+                zoom: this._redraw,
+                moveend: this._redraw,
+                mousemove: this._onMouseMove,
+                click: this._onClick,
+                mouseout: this._handleMouseOut
+            };
+            if (this._zoomAnimated) {
+                events.zoomanim = this._onAnimZoom;
+            }
+            return events;
+        },
         _onAnimZoom: function (ev) {
             this._updateTransform(ev.center, ev.zoom);
         },
-
         _onZoom: function () {
             this._updateTransform(this._map.getCenter(), this._map.getZoom());
         },
-        getEvents: function () {
-            return {};
-        },
         _initContainer: function () {
             var container = this._container = document.createElement('canvas');
-
-            this._map.on('viewreset', this._reset, this);
-            this._map.on('zoom moveend', this._redraw, this);
-            this._map.on('mousemove', this._onMouseMove, this);
-            this._map.on('click', this._onClick, this);
-            this._map.on('mouseout', this._handleMouseOut, this);
-            if (this._zoomAnimated) {
-                this._map.on('zoomanim', this._onAnimZoom, this);
-            }
-
             this._ctx = container.getContext('2d');
         },
         _reset: function () {
@@ -105,11 +105,6 @@ function layerFactory(L) {
             delete this._markers;
             delete this._latlngMarkers;
             delete this._ctx;
-            this._map.off('viewreset', this._reset, this);
-            this._map.off('zoom moveend', this._redraw, this);
-            this._map.off('mousemove', this._onMouseMove, this);
-            this._map.off('click', this._onClick, this);
-            this._map.off('mouseout', this._handleMouseOut, this);
             this._container.remove();
             delete this._container;
         },

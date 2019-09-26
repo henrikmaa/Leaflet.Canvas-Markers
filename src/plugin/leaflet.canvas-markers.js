@@ -18,7 +18,7 @@ function layerFactory(L) {
 
         onAdd: function () {
             L.Renderer.prototype.onAdd.call(this);
-            L.DomUtil.toBack(this._container);
+            // L.DomUtil.toBack(this._container);
         },
 
         onRemove: function () {
@@ -31,10 +31,7 @@ function layerFactory(L) {
             var events = {
                 viewreset: this._reset,
                 zoom: this._onZoom,
-                moveend: this._update,
-                mousemove: this._onMouseMove,
-                click: this._onClick,
-                mouseout: this._handleMouseOut
+                moveend: this._update
             };
             if (this._zoomAnimated) {
                 events.zoomanim = this._onAnimZoom;
@@ -48,8 +45,7 @@ function layerFactory(L) {
             L.Renderer.prototype._onZoom.call(this);
         },
         _initContainer: function () {
-            var container = this._container = document.createElement('canvas');
-            this._ctx = container.getContext('2d');
+            L.Canvas.prototype._initContainer.call(this);
         },
         _reset: function () {
             this._update();
@@ -189,64 +185,71 @@ function layerFactory(L) {
             );
         },
         _searchPoints: function (point) {
-            return this._markers.search({ minX: point.x, minY: point.y, maxX: point.x, maxY: point.y });
+            return this._markers && this._markers.search({
+                minX: point.x, minY: point.y, maxX: point.x, maxY: point.y
+            });
         },
 
         _onClick: function (e) {
-            if (!this._markers) { return; }
-
-            var self = this;
-            var point = e.containerPoint;
+            var point = this._map.mouseEventToContainerPoint(e), layer, clickedLayer; // !!L.Canvas uses mouseEventToLayerPoint(e)
 
             var layer_intersect = this._searchPoints(point);
-            if (layer_intersect && layer_intersect.length > 0) {
-                e.originalEvent.stopPropagation();
-                var layer = layer_intersect[0].data
-                layer.fire('click', e, true);
+            if (layer_intersect) {
+                layer_intersect.forEach(function (el) {
+                    layer = el.data;
+                    if (layer.options.interactive && !this._map._draggableMoved(layer)) {
+                        clickedLayer = layer;
+                    }
+                }, this);
+            }
+            if (clickedLayer) {
+                L.DomEvent.fakeStop(e);
+                this._fireEvent([clickedLayer], e);
             }
         },
-        _onMouseMove: function (e) {
-            if (!this._markers || this._map.dragging.moving() || this._map._animatingZoom) { return; }
 
-            var point = e.containerPoint;
+        _onMouseMove: function (e) {
+            if (!this._map || this._map.dragging.moving() || this._map._animatingZoom) { return; }
+
+            var point = this._map.mouseEventToContainerPoint(e); // !!L.Canvas uses mouseEventToLayerPoint(e)
             this._handleMouseHover(e, point);
         },
-        _handleMouseHover: function (e, point) {
-            var newHoverLayer;
-            var layer_intersect = this._searchPoints(point);
 
-            if (layer_intersect && layer_intersect.length > 0) {
-                newHoverLayer = layer_intersect[0].data;
-                var maxPoint = new L.Point(layer_intersect[0].maxX, layer_intersect[0].maxY);
-                var minPoint = new L.Point(layer_intersect[0].minX, layer_intersect[0].minY);
-                e.containerPoint = maxPoint.add(minPoint).divideBy(2).round();
+        _handleMouseHover: function (e, point) {
+            var layer, candidateHoveredLayer;
+            var layer_intersect = this._searchPoints(point);
+            if (layer_intersect) {
+                layer_intersect.forEach(function (el) {
+                    layer = el.data;
+                    if (layer.options.interactive) {
+                        candidateHoveredLayer = layer;
+                    }
+                }, this);
             }
 
-            if (newHoverLayer !== this._hoveredLayer) {
+            if (candidateHoveredLayer !== this._hoveredLayer) {
                 this._handleMouseOut(e);
 
-                if (newHoverLayer) {
-                    L.DomUtil.addClass(this._container, 'leaflet-interactive');
-                    this._hoveredLayer = newHoverLayer;
-                    newHoverLayer.fire('mouseover', e, true);
-                    e.originalEvent.stopPropagation();
+                if (candidateHoveredLayer) {
+                    L.DomUtil.addClass(this._container, 'leaflet-interactive'); // change cursor
+                    this._fireEvent([candidateHoveredLayer], e, 'mouseover');
+                    this._hoveredLayer = candidateHoveredLayer;
                 }
             }
 
             if (this._hoveredLayer) {
-                this._hoveredLayer.fire('mouseover', e, true);
+                this._fireEvent([this._hoveredLayer], e);
             }
+        },
 
-        },
         _handleMouseOut: function (e) {
-            var layer = this._hoveredLayer;
-            if (layer) {
-                // if we're leaving the layer, fire mouseout
-                L.DomUtil.removeClass(this._container, 'leaflet-interactive');
-                layer.fire('mouseout', e, true);
-                this._hoveredLayer = null;
-            }
+            L.Canvas.prototype._handleMouseOut.call(this,e);
         },
+
+        _fireEvent: function (layers, e, type) {
+            L.Canvas.prototype._fireEvent.call(this, layers, e, type);
+        },
+
         //Multiple layers at a time for rBush performance
         addMarkers: function (markers, groupID) {
             var self = this;

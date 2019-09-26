@@ -49,8 +49,10 @@
     var ciLayer = L.canvasIconLayer().addTo(map);
 
     ciLayer
-      .on('mouseover',function (e) { console.log(e.target._leaflet_id); })
-      .on('click',function (e) { console.log(e); });
+      .on('mouseover',function (e) { console.log(e.sourceTarget._leaflet_id); })
+      .bindPopup(function (layer) {
+        return("I am " + layer._leaflet_id);
+      });
 
     var icons = [
       L.icon({
@@ -82,9 +84,7 @@
           icon: icons[Math.round(Math.random()*3)]
         };
         var marker = L.marker(latlng, options)
-          .bindPopup(function (layer) {
-            return "I am " + layer._leaflet_id;
-          });
+          .on('click',function (e) { console.log(e); });
         markers.push(marker);
       }
     ciLayer.addLayers(markers);

@@ -267,16 +267,7 @@ function layerFactory(L) {
         _searchPoints: function (point) {
             return this._markers.search({ minX: point.x, minY: point.y, maxX: point.x, maxY: point.y });
         },
-        on: function (event, func) {
-            var self = this;
-            if (!self._userEvents)
-                self._userEvents = {};
-            L.Util.splitWords(event).forEach(function (e) {
-                self._userEvents[e] = func;
-            });
 
-            return this;
-        },
         _onClick: function (e) {
             if (!this._markers) { return; }
 
@@ -287,16 +278,7 @@ function layerFactory(L) {
             if (layer_intersect && layer_intersect.length > 0) {
                 e.originalEvent.stopPropagation();
                 var layer = layer_intersect[0].data
-                e.target = layer;
-                var maxPoint = new L.Point(layer_intersect[0].maxX, layer_intersect[0].maxY);
-                var minPoint = new L.Point(layer_intersect[0].minX, layer_intersect[0].minY);
-                e.containerPoint = maxPoint.add(minPoint).divideBy(2).round();
-                if (layer.listens('click')) {
-                    layer.fire('click', e);
-                }
-                else if (self._userEvents.click) {
-                    self._userEvents['click'].call(layer, e);
-                }
+                layer.fire('click', e, true);
             }
         },
         _onMouseMove: function (e) {
@@ -322,25 +304,13 @@ function layerFactory(L) {
                 if (newHoverLayer) {
                     L.DomUtil.addClass(this._container, 'leaflet-interactive');
                     this._hoveredLayer = newHoverLayer;
-                    e.target = newHoverLayer;
-                    if (newHoverLayer.listens('mouseover')) {
-                        newHoverLayer.fire('mouseover', e);
-                    }
-                    else if (this._userEvents.mouseover) {
-                        this._userEvents['mouseover'].call(newHoverLayer, e);
-                    }
+                    newHoverLayer.fire('mouseover', e, true);
                     e.originalEvent.stopPropagation();
                 }
             }
 
             if (this._hoveredLayer) {
-                e.target = this._hoveredLayer;
-                if (this._hoveredLayer.listens('mouseover')) {
-                    this._hoveredLayer.fire('mouseover', e);
-                }
-                else if (this._userEvents.mouseover) {
-                    this._userEvents['mouseover'].call(this._hoveredLayer, e);
-                }
+                this._hoveredLayer.fire('mouseover', e, true);
             }
 
         },
@@ -349,13 +319,7 @@ function layerFactory(L) {
             if (layer) {
                 // if we're leaving the layer, fire mouseout
                 L.DomUtil.removeClass(this._container, 'leaflet-interactive');
-                e.target = layer;
-                if (layer.listens('mouseout')) {
-                    layer.fire('mouseout', e);
-                }
-                else if (this._userEvents.mouseout) {
-                    this._userEvents['mouseout'].call(layer, e);
-                }
+                layer.fire('mouseout', e, true);
                 this._hoveredLayer = null;
             }
         },
@@ -528,6 +492,7 @@ function layerFactory(L) {
             if (isDisplaying === true && redraw === true) {
                 self._redraw();
             }
+            marker.removeEventParent(this);
         },
         _removeGeneric: function (val, compareFn)
         {
@@ -555,6 +520,7 @@ function layerFactory(L) {
             }
 
             L.Util.stamp(marker);
+            marker.addEventParent(self);
 
             if (self._map)
                 var pointPos = self._map.latLngToContainerPoint(latlng);

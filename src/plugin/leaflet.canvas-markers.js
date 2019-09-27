@@ -2,10 +2,12 @@
 
 function layerFactory(L) {
 
-    var CanvasIconLayer = (L.Layer ? L.Layer : L.Class).extend({
+    var CanvasIconLayer = L.Layer.extend({ // todo inherit from L.Renderer or L.Canvas
+
+        options: L.Canvas.prototype.options,
+
         initialize: function (options) {
-            L.Util.setOptions(this, options);
-            L.Util.stamp(this);
+            L.Renderer.prototype.initialize.call(this, options);
             //_latlngMarkers contains Lat\Long coordinates of all markers in layer.
             this._latlngMarkers = new rbush();
             this._latlngMarkers.dirty = 0;
@@ -13,30 +15,23 @@ function layerFactory(L) {
             //_markers contains Points of markers currently displaying on map
             this._markers = new rbush();
         },
+
         onAdd: function () {
-            if (!this._container) {
-                this._initContainer(); // defined by renderer implementations
-
-                if (this._zoomAnimated) {
-                    L.DomUtil.addClass(this._container, 'leaflet-zoom-animated');
-                }
-
-            }
-
-            this.getPane().appendChild(this._container);
+            L.Renderer.prototype.onAdd.call(this);
             L.DomUtil.toBack(this._container);
-            this._update();
-            this._updateCtx();
-            this._draw();
         },
+
         onRemove: function () {
-            this._destroyContainer();
+            L.Renderer.prototype.onRemove.call(this);
         },
-        getEvents: function () {
+
+        _updatePaths: L.Util.falseFn, // stub for L.Renderer onAdd/onRemove
+
+        getEvents: function () { // todo use L.Renderer.prototype.getEvents
             var events = {
                 viewreset: this._reset,
-                zoom: this._redraw,
-                moveend: this._redraw,
+                zoom: this._onZoom,
+                moveend: this._update,
                 mousemove: this._onMouseMove,
                 click: this._onClick,
                 mouseout: this._handleMouseOut
@@ -47,10 +42,10 @@ function layerFactory(L) {
             return events;
         },
         _onAnimZoom: function (ev) {
-            this._updateTransform(ev.center, ev.zoom);
+            L.Renderer.prototype._onAnimZoom.call(this, ev);
         },
         _onZoom: function () {
-            this._updateTransform(this._map.getCenter(), this._map.getZoom());
+            L.Renderer.prototype._onZoom.call(this);
         },
         _initContainer: function () {
             var container = this._container = document.createElement('canvas');
@@ -59,25 +54,9 @@ function layerFactory(L) {
         _reset: function () {
             this._update();
             this._updateTransform(this._center, this._zoom);
-            this._redraw();
         },
         _updateTransform: function (center, zoom) {
-            if (!this._map)
-                return;
-            var scale = this._map.getZoomScale(zoom, this._zoom),
-                position = L.DomUtil.getPosition(this._container),
-                viewHalf = this._map.getSize().multiplyBy(0.5),
-                currentCenterPoint = this._map.project(this._center, zoom),
-                destCenterPoint = this._map.project(center, zoom),
-                centerOffset = destCenterPoint.subtract(currentCenterPoint)
-
-            this._topLeftOffset = viewHalf.multiplyBy(-scale).add(position).add(viewHalf).subtract(centerOffset);
-
-            if (L.Browser.any3d) {
-                L.DomUtil.setTransform(this._container, this._topLeftOffset, scale);
-            } else {
-                L.DomUtil.setPosition(this._container, this._topLeftOffset);
-            }
+            L.Renderer.prototype._updateTransform.call(this, center, zoom);
         },
         clearLayers: function () {
 			this._latlngMarkers.clear();
@@ -86,72 +65,18 @@ function layerFactory(L) {
             return;
         },
         _clear: function () {
-            var bounds = this._redrawBounds;
-            if (bounds) {
-                var size = bounds.getSize();
-                this._ctx.clearRect(bounds.min.x, bounds.min.y, size.x, size.y);
-            } else {
-                this._ctx.clearRect(0, 0, this._container.width, this._container.height);
-            }
+            L.Canvas.prototype._clear.call(this);
         },
         _redraw: function () {
-            this._redrawRequest = null;
-
-            if (this._redrawBounds) {
-                this._redrawBounds.min._floor();
-                this._redrawBounds.max._ceil();
-            }
-            this._update();
-            this._clear(); // clear layers in redraw bounds
-            this._draw(); // draw layers
-
-            this._redrawBounds = null;
+            L.Canvas.prototype._redraw.call(this);
         },
         _destroyContainer: function () {
+            L.Canvas.prototype._destroyContainer.call(this);
             this._markers.clear();
-            this._container.remove();
-            delete this._ctx;
-            delete this._container;
         },
         _update: function () {
-            if (!this._map)
-                return;
-            if (this._map._animatingZoom && this._bounds) { return; }
-
-            var p = 0,
-                size = this._map.getSize(),
-                min = this._map.containerPointToLayerPoint(size.multiplyBy(-p)).round();
-
-            this._bounds = new L.bounds(min, min.add(size.multiplyBy(1 + p * 2)).round());
-
-            this._center = this._map.getCenter();
-            this._zoom = this._map.getZoom();
-
-            if (this._markers)
-                this._markers.clear();
-
-            var b = this._bounds,
-                container = this._container,
-                size = b.getSize(),
-                m = L.Browser.retina ? 2 : 1;
-
-            L.DomUtil.setPosition(container, b.min);
-        },
-        _updateCtx: function () {
-            var b = this._bounds,
-                container = this._container,
-                size = b.getSize(),
-                m = L.Browser.retina ? 2 : 1;
-
-            // set canvas size (also clearing it); use double size on retina
-            container.width = m * size.x;
-            container.height = m * size.y;
-            container.style.width = size.x + 'px';
-            container.style.height = size.y + 'px';
-
-            if (L.Browser.retina) {
-                this._ctx.scale(2, 2);
-            }
+            L.Canvas.prototype._update.call(this);
+            this._draw();
         },
         _draw: function () {
             var self = this;
@@ -254,7 +179,7 @@ function layerFactory(L) {
                     return;
 
             var options = marker.options.icon.options;
-            var pos = pointPos.subtract(options.iconAnchor);
+            var pos = this._map.containerPointToLayerPoint(pointPos.subtract(options.iconAnchor));
             this._ctx.drawImage(
                 marker.canvas_img,
                 pos.x,
@@ -497,10 +422,6 @@ function layerFactory(L) {
         {
             this._latlngMarkers.remove(val, compareFn);
             this._latlngMarkers.total--;
-        },
-        addTo: function (map) {
-            map.addLayer(this);
-            return this;
         },
         _addMarker: function (marker, latlng, isDisplaying) {
             var self = this;

@@ -259,12 +259,14 @@ function layerFactory(L) {
                 else
                     return;
 
+            var options = marker.options.icon.options;
+            var pos = pointPos.subtract(options.iconAnchor);
             this._ctx.drawImage(
                 marker.canvas_img,
-                pointPos.x - marker.options.icon.options.iconAnchor[0],//+(this._topLeftOffset?this._topLeftOffset.x/2:0),
-                pointPos.y - marker.options.icon.options.iconAnchor[1],//+(this._topLeftOffset?this._topLeftOffset.y/2:0),
-                marker.options.icon.options.iconSize[0],
-                marker.options.icon.options.iconSize[1]
+                pos.x,
+                pos.y,
+                options.iconSize[0],
+                options.iconSize[1]
             );
         },
         _searchPoints: function (point) {

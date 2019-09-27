@@ -11,7 +11,7 @@
     "build:test": "set NODE_ENV=test&& webpack",
     "build": "set NODE_ENV=prod&& webpack",
     "watch": "set NODE_ENV=test&& webpack --watch",
-    "prepublish": "npm run build"
+    "prepare": "npm run build"
   },
   "keywords": [
     "leaflet",
@@ -23,13 +23,13 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/eJuke/Leaflet.Canvas-Markers.git"
+    "url": "https://github.com/Spaction/Leaflet.Canvas-Markers.git"
   },
   "devDependencies": {
     "script-loader": "^0.7.2",
-    "uglifyjs-webpack-plugin": "^1.2.5",
-    "webpack": "^4.12.0",
-    "webpack-cli": "^3.0.3"
+    "uglifyjs-webpack-plugin": "^2.2.0",
+    "webpack": "^4.41.0",
+    "webpack-cli": "^3.3.9"
   },
   "peerDependencies": {
     "leaflet": "^1.0.0"

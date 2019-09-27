@@ -35,7 +35,6 @@ function layerFactory(L) {
         getEvents: function () {
             var events = {
                 viewreset: this._reset,
-                resize: this._resize,
                 zoom: this._redraw,
                 moveend: this._redraw,
                 mousemove: this._onMouseMove,
@@ -56,11 +55,6 @@ function layerFactory(L) {
         _initContainer: function () {
             var container = this._container = document.createElement('canvas');
             this._ctx = container.getContext('2d');
-        },
-        _resize: function () {
-            this._update();
-            this._updateCtx();
-            this._redraw();
         },
         _reset: function () {
             this._update();

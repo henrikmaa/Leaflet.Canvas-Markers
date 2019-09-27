@@ -4,7 +4,7 @@ Feel free to contribute
 
 ## Demo
 
-There's a [demo](http://eJuke.github.io/Leaflet.Canvas-Markers/examples/index.html) for 10000 points, running on Canvas
+There's a [demo](https://raw.githack.com/Spaction/Leaflet.Canvas-Markers/master/examples/index.html) for 10000 points, running on Canvas
 
 ## Installation and basic usage
 
@@ -18,7 +18,7 @@ Now attach layer to map and some markers.
 
 ```js
 // Adds a layer
-var ciLayer = L.canvasIconLayer({}).addTo(map);
+var ciLayer = L.canvasIconLayer().addTo(map);
 
 // Marker definition
 var marker =  L.marker([58.5578, 29.0087], {icon: icon});
@@ -67,9 +67,6 @@ You can also use L.circleMarker for your points with similar performance, but th
 - **addMarker(marker)**: Adds a marker to the layer.
 - **addMarkers(markers)**: Adds a markers to the layer.
 - **removeMarker(marker, redraw)**: Removes a marker from the layer. Set **redraw** to `true` if you want to redraw layer after marker remove
-- **redraw()**: Redraws the layer
-- **addOnClickListener(eventHandler)**: Adds common click listener for all markers
-- **addOnHoverListener(eventHandler)**: Adds a hover over listener for all markers
 
 I also implemented binds for default **addLayer**, **addLayers** and **removeLayer** (equal to removeMarker(marker, _true_) methods.
 

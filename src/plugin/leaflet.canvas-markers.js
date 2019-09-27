@@ -460,14 +460,14 @@ function layerFactory(L) {
             }
 
         },
+        /*
         removeLayers: function (layers) {
-            var self = this;
             layers.forEach(function (e) {
                 self.removeMarker(e, false);
-            });
-            if (redraw && redraw === true)
-                self.redraw();
+            },this);
+            this._redraw();
         },
+        */
         removeLayer: function (layer) {
             this.removeMarker(layer, true);
         },
@@ -520,7 +520,6 @@ function layerFactory(L) {
             else
                 var pointPos = L.point(0, 0);
 
-			var iconOptions = marker.options.icon.options;
             var iconSize = marker.options.icon.options.iconSize;
 
             var adj_x = iconSize[0] / 2;

@@ -251,7 +251,7 @@ function layerFactory (L) {
             L.Canvas.prototype._fireEvent.call(this, layers, e, type);
         },
 
-        _addMarker: function (marker, latlng, isDisplaying) {
+        _addMarker: function (marker, latlng, isDisplaying, points, latlngs) {
             if (!(marker instanceof L.Marker)) {
                 throw new Error("Layer isn't a marker");
             }
@@ -261,7 +261,6 @@ function layerFactory (L) {
 
             this._latlngMarkers.dirty++;
             this._latlngMarkers.total++;
-            var point;
             if (isDisplaying) {
                 var pointPos = this._map.latLngToContainerPoint(latlng);
                 this._drawMarker(marker, pointPos);
@@ -269,25 +268,31 @@ function layerFactory (L) {
                 var iconSize = marker.options.icon.options.iconSize;
                 var adj_x = iconSize[0] / 2;
                 var adj_y = iconSize[1] / 2;
-                point = {
+                var p = {
                     minX: pointPos.x - adj_x,
                     minY: pointPos.y - adj_y,
                     maxX: pointPos.x + adj_x,
                     maxY: pointPos.y + adj_y,
                     marker: marker
                 };
-            }
-
-            return [
-                point,
-                {
-                    minX: latlng.lng,
-                    minY: latlng.lat,
-                    maxX: latlng.lng,
-                    maxY: latlng.lat,
-                    marker: marker
+                if (points) {
+                    points.push(p);
+                } else {
+                    this._markers.insert(p);
                 }
-            ];
+            }
+            var ll = {
+                minX: latlng.lng,
+                minY: latlng.lat,
+                maxX: latlng.lng,
+                maxY: latlng.lat,
+                marker: marker
+            };
+            if (latlngs) {
+                latlngs.push(ll);
+            } else {
+                this._latlngMarkers.insert(ll);
+            }
         },
 
         // Adds single layer at a time. Less efficient for rBush
@@ -297,13 +302,9 @@ function layerFactory (L) {
 
             var latlng = marker.getLatLng();
             var isDisplaying = this._map && this._map.getBounds().contains(latlng);
-            var dat = this._addMarker(marker, latlng, isDisplaying);
+            this._addMarker(marker, latlng, isDisplaying);
             this._groupIDs[groupID] = (this._groupIDs[groupID] || 0) + 1;
             marker._canvasGroupID = groupID;
-            if (isDisplaying) {
-                this._markers.insert(dat[0]);
-            }
-            this._latlngMarkers.insert(dat[1]);
             return this;
         },
 
@@ -317,19 +318,14 @@ function layerFactory (L) {
             this._groupIDs = this._groupIDs || {};
             this._groupIDs[groupID] = this._groupIDs[groupID] || 0;
 
-            var tmpMark = [];
-            var tmpLatLng = [];
+            var tmpMark = [], tmpLatLng = [];
             var mapBounds = this._map && this._map.getBounds();
             markers.forEach(function (marker) {
                 var latlng = marker.getLatLng();
                 var isDisplaying = mapBounds && mapBounds.contains(latlng);
-                var s = this._addMarker(marker, latlng, isDisplaying);
+                this._addMarker(marker, latlng, isDisplaying, tmpMark, tmpLatLng);
                 this._groupIDs[groupID]++;
                 marker._canvasGroupID = groupID;
-                if (isDisplaying) {
-                    tmpMark.push(s[0]);
-                }
-                tmpLatLng.push(s[1]);
             }, this);
             this._markers.load(tmpMark);
             this._latlngMarkers.load(tmpLatLng);

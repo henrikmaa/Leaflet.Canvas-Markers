@@ -21,11 +21,18 @@ function layerFactory (L) {
             L.DomUtil.toBack(this._container);
         },
 
+        _initContainer: function () {
+            L.Canvas.prototype._initContainer.call(this);
+        },
+
         onRemove: function () {
             L.Renderer.prototype.onRemove.call(this);
         },
 
-        _updatePaths: L.Util.falseFn, // stub for L.Renderer onAdd/onRemove
+        _destroyContainer: function () {
+            L.Canvas.prototype._destroyContainer.call(this);
+            this._markers.clear();
+        },
 
         getEvents: function () { // todo use L.Renderer.prototype.getEvents
             var events = {
@@ -50,8 +57,15 @@ function layerFactory (L) {
             L.Renderer.prototype._onZoom.call(this);
         },
 
-        _initContainer: function () {
-            L.Canvas.prototype._initContainer.call(this);
+        _updateTransform: function (center, zoom) {
+            L.Renderer.prototype._updateTransform.call(this, center, zoom);
+        },
+
+        _updatePaths: L.Util.falseFn, // stub for L.Renderer onAdd/onRemove
+
+        _update: function () {
+            L.Canvas.prototype._update.call(this);
+            this._draw();
         },
 
         _reset: function () {
@@ -59,33 +73,12 @@ function layerFactory (L) {
             this._updateTransform(this._center, this._zoom);
         },
 
-        _updateTransform: function (center, zoom) {
-            L.Renderer.prototype._updateTransform.call(this, center, zoom);
-        },
-
-        clearLayers: function () {
-            this._latlngMarkers.clear();
-            this._markers.clear();
-            this._clear();
-            return;
-        },
-
-        _clear: function () {
-            L.Canvas.prototype._clear.call(this);
-        },
-
         _redraw: function () {
             L.Canvas.prototype._redraw.call(this);
         },
 
-        _destroyContainer: function () {
-            L.Canvas.prototype._destroyContainer.call(this);
-            this._markers.clear();
-        },
-
-        _update: function () {
-            L.Canvas.prototype._update.call(this);
-            this._draw();
+        _clear: function () {
+            L.Canvas.prototype._clear.call(this);
         },
 
         _draw: function () {
@@ -258,111 +251,6 @@ function layerFactory (L) {
             L.Canvas.prototype._fireEvent.call(this, layers, e, type);
         },
 
-        // Multiple layers at a time for rBush performance
-        addMarkers: function (markers, groupID) {
-            groupID = groupID ? groupID.toString() : '0';
-            this._groupIDs = this._groupIDs || {};
-            this._groupIDs[groupID] = this._groupIDs[groupID] || 0;
-
-            var tmpMark = [];
-            var tmpLatLng = [];
-            var mapBounds = this._map && this._map.getBounds();
-            markers.forEach(function (marker) {
-                var latlng = marker.getLatLng();
-                var isDisplaying = mapBounds && mapBounds.contains(latlng);
-                var s = this._addMarker(marker, latlng, isDisplaying);
-                this._groupIDs[groupID]++;
-                marker._canvasGroupID = groupID;
-                if (isDisplaying) {
-                    tmpMark.push(s[0]);
-                }
-                tmpLatLng.push(s[1]);
-            }, this);
-            this._markers.load(tmpMark);
-            this._latlngMarkers.load(tmpLatLng);
-        },
-
-        // Adds single layer at a time. Less efficient for rBush
-        addMarker: function (marker, groupID) {
-            groupID = groupID ? groupID.toString() : '0';
-            this._groupIDs = this._groupIDs || {};
-
-            var latlng = marker.getLatLng();
-            var isDisplaying = this._map && this._map.getBounds().contains(latlng);
-            var dat = this._addMarker(marker, latlng, isDisplaying);
-            this._groupIDs[groupID] = (this._groupIDs[groupID] || 0) + 1;
-            marker._canvasGroupID = groupID;
-            if (isDisplaying) {
-                this._markers.insert(dat[0]);
-            }
-            this._latlngMarkers.insert(dat[1]);
-        },
-
-        addLayer: function (layer, groupID) {
-            this.addMarker(layer,groupID);
-        },
-
-        addLayers: function (layers, groupID) {
-            this.addMarkers(layers,groupID);
-        },
-
-        removeGroups: function (groupIDs) {
-            groupIDs.forEach(function (groupID) {
-                this._removeGroup(groupID);
-            }, this);
-            this._redraw();
-        },
-
-        removeGroup: function (groupID) {
-            this._removeGroup(groupID);
-            this._redraw();
-        },
-
-        _removeGroup: function (groupID) {
-            groupID = groupID.toString();
-            if (!this._groupIDs[groupID]) { return; }
-            delete this._groupIDs[groupID];
-            this._latlngMarkers.all().filter(function (el) {
-                return el.marker._canvasGroupID === groupID;
-            }).forEach(function (el) {
-                this._latlngMarkers.remove(el);
-                this._latlngMarkers.total--;
-            }, this);
-        },
-        /*
-        removeLayers: function (layers) {
-            layers.forEach(function (el) {
-                this.removeMarker(el, false);
-            }, this);
-            this._redraw();
-        },
-        */
-        removeLayer: function (layer) {
-            this.removeMarker(layer, true);
-        },
-
-        removeMarker: function (marker, redraw) {
-            var latlng = marker.getLatLng();
-            var isDisplaying = this._map && this._map.getBounds().contains(latlng);
-            var val = {
-                minX: latlng.lng,
-                minY: latlng.lat,
-                maxX: latlng.lng,
-                maxY: latlng.lat,
-                marker: marker
-            };
-
-            this._latlngMarkers.remove(val, function (a, b) {
-                return a.marker === b.marker;
-            });
-            this._latlngMarkers.total--;
-
-            if (isDisplaying && redraw) {
-                this._redraw();
-            }
-            marker.removeEventParent(this);
-        },
-
         _addMarker: function (marker, latlng, isDisplaying) {
             if (!(marker instanceof L.Marker)) {
                 throw new Error("Layer isn't a marker");
@@ -400,6 +288,118 @@ function layerFactory (L) {
                     marker: marker
                 }
             ];
+        },
+
+        // Adds single layer at a time. Less efficient for rBush
+        addMarker: function (marker, groupID) {
+            groupID = groupID ? groupID.toString() : '0';
+            this._groupIDs = this._groupIDs || {};
+
+            var latlng = marker.getLatLng();
+            var isDisplaying = this._map && this._map.getBounds().contains(latlng);
+            var dat = this._addMarker(marker, latlng, isDisplaying);
+            this._groupIDs[groupID] = (this._groupIDs[groupID] || 0) + 1;
+            marker._canvasGroupID = groupID;
+            if (isDisplaying) {
+                this._markers.insert(dat[0]);
+            }
+            this._latlngMarkers.insert(dat[1]);
+        },
+
+        addLayer: function (layer, groupID) {
+            this.addMarker(layer,groupID);
+        },
+
+        // Multiple layers at a time for rBush performance
+        addMarkers: function (markers, groupID) {
+            groupID = groupID ? groupID.toString() : '0';
+            this._groupIDs = this._groupIDs || {};
+            this._groupIDs[groupID] = this._groupIDs[groupID] || 0;
+
+            var tmpMark = [];
+            var tmpLatLng = [];
+            var mapBounds = this._map && this._map.getBounds();
+            markers.forEach(function (marker) {
+                var latlng = marker.getLatLng();
+                var isDisplaying = mapBounds && mapBounds.contains(latlng);
+                var s = this._addMarker(marker, latlng, isDisplaying);
+                this._groupIDs[groupID]++;
+                marker._canvasGroupID = groupID;
+                if (isDisplaying) {
+                    tmpMark.push(s[0]);
+                }
+                tmpLatLng.push(s[1]);
+            }, this);
+            this._markers.load(tmpMark);
+            this._latlngMarkers.load(tmpLatLng);
+        },
+
+        addLayers: function (layers, groupID) {
+            this.addMarkers(layers,groupID);
+        },
+
+        removeGroups: function (groupIDs) {
+            groupIDs.forEach(function (groupID) {
+                this._removeGroup(groupID);
+            }, this);
+            this._redraw();
+        },
+
+        removeGroup: function (groupID) {
+            this._removeGroup(groupID);
+            this._redraw();
+        },
+
+        _removeGroup: function (groupID) {
+            groupID = groupID.toString();
+            if (!this._groupIDs[groupID]) { return; }
+            delete this._groupIDs[groupID];
+            this._latlngMarkers.all().filter(function (el) {
+                return el.marker._canvasGroupID === groupID;
+            }).forEach(function (el) {
+                this._latlngMarkers.remove(el);
+                this._latlngMarkers.total--;
+            }, this);
+        },
+
+        removeMarker: function (marker, redraw) {
+            var latlng = marker.getLatLng();
+            var isDisplaying = this._map && this._map.getBounds().contains(latlng);
+            var val = {
+                minX: latlng.lng,
+                minY: latlng.lat,
+                maxX: latlng.lng,
+                maxY: latlng.lat,
+                marker: marker
+            };
+
+            this._latlngMarkers.remove(val, function (a, b) {
+                return a.marker === b.marker;
+            });
+            this._latlngMarkers.total--;
+
+            if (isDisplaying && redraw) {
+                this._redraw();
+            }
+            marker.removeEventParent(this);
+        },
+
+        removeLayer: function (layer) {
+            this.removeMarker(layer, true);
+        },
+        /*
+        removeLayers: function (layers) {
+            layers.forEach(function (el) {
+                this.removeMarker(el, false);
+            }, this);
+            this._redraw();
+        },
+        */
+        clearLayers: function () {
+            this._latlngMarkers.clear();
+            this._markers.clear();
+            this._clear();
+            return;
         }
     });
 

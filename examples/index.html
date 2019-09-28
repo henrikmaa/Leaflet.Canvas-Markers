@@ -46,7 +46,7 @@
       attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
 
-    var ciLayer = L.canvasIconLayer().addTo(map);
+    var ciLayer = L.canvasIconLayer({padding: 0.5}).addTo(map);
 
     ciLayer
       .on('mouseover',function (e) { console.log(e.sourceTarget._leaflet_id); })

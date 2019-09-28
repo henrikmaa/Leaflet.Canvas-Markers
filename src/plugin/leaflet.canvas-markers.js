@@ -101,7 +101,7 @@ function layerFactory (L) {
                 this._latlngMarkers.dirty = 0;
                 tmp = [];
             }
-            var mapBounds = this._map.getBounds();
+            var mapBounds = this._map.getBounds().pad(this.options.padding);
 
             // Only re-draw what we are showing on the map.
             this._latlngMarkers.search({
@@ -301,7 +301,7 @@ function layerFactory (L) {
             this._groupIDs = this._groupIDs || {};
 
             var latlng = marker.getLatLng();
-            var isDisplaying = this._map && this._map.getBounds().contains(latlng);
+            var isDisplaying = this._map && this._map.getBounds().pad(this.options.padding).contains(latlng);
             this._addMarker(marker, latlng, isDisplaying);
             this._groupIDs[groupID] = (this._groupIDs[groupID] || 0) + 1;
             marker._canvasGroupID = groupID;
@@ -319,7 +319,7 @@ function layerFactory (L) {
             this._groupIDs[groupID] = this._groupIDs[groupID] || 0;
 
             var tmpMark = [], tmpLatLng = [];
-            var mapBounds = this._map && this._map.getBounds();
+            var mapBounds = this._map && this._map.getBounds().pad(this.options.padding);
             markers.forEach(function (marker) {
                 var latlng = marker.getLatLng();
                 var isDisplaying = mapBounds && mapBounds.contains(latlng);
@@ -364,7 +364,7 @@ function layerFactory (L) {
 
         removeMarker: function (marker, redraw) {
             var latlng = marker.getLatLng();
-            var isDisplaying = this._map && this._map.getBounds().contains(latlng);
+            var isDisplaying = this._map && this._map.getBounds().pad(this.options.padding).contains(latlng);
             var val = {
                 minX: latlng.lng,
                 minY: latlng.lat,

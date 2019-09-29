@@ -2,18 +2,89 @@
 
 function layerFactory (L) {
 
+    function extend (Parent, props) {
+        var NewClass = function () {
+            Parent.apply(this, arguments);
+            if (this.init) { this.init.apply(this, arguments); }
+        };
+        var proto = L.Util.create(Parent.prototype);
+        L.Util.extend(proto, props);
+        NewClass.prototype = proto;
+        return NewClass;
+    }
+
+    var LatLngsIndex = extend(rbush, {
+        toBBox: function (marker) {
+            var ll = marker._latlng;
+            return {minX: ll.lng, minY: ll.lat, maxX: ll.lng, maxY: ll.lat};
+        },
+        compareMinX: function (a, b) { return a._latlng.lng - b._latlng.lng; },
+        compareMinY: function (a, b) { return a._latlng.lat - b._latlng.lat; },
+        searchIn: function (bounds) {
+            return this.search({
+                minX: bounds.getWest(),
+                minY: bounds.getSouth(),
+                maxX: bounds.getEast(),
+                maxY: bounds.getNorth()
+            });
+        },
+        init: function () {
+            this._dirty = 0;
+            this._total = 0;
+        },
+        // If we are 10% individual inserts\removals, reconstruct lookup for efficiency
+        cleanup: function () {
+            if (this._dirty / this._total >= .1) {
+                var all = this.all();
+                this.clear();
+                this._dirty = 0;
+                this.load(all);
+            }
+            return this;
+        },
+        insert: function () {
+            this._dirty++;
+            this._total++;
+            return rbush.prototype.insert.apply(this, arguments);
+        },
+        remove: function (item) {
+            this._total--;
+            return rbush.prototype.remove.apply(this, arguments);
+        }
+    });
+
+    var PointsIndex = extend(rbush, {
+        toBBox: function (marker) {
+            var iconSize = marker.options.icon.options.iconSize;
+            var pos = marker._point;
+            var adj_x = iconSize[0] / 2;
+            var adj_y = iconSize[1] / 2;
+            return {
+                minX: pos.x - adj_x,
+                minY: pos.y - adj_y,
+                maxX: pos.x + adj_x,
+                maxY: pos.y + adj_y,
+            };
+        },
+        compareMinX: function (a, b) { return a._point.x - b._point.x; },
+        compareMinY: function (a, b) { return a._point.y - b._point.y; },
+        searchBy: function (point) {
+            return this.search({
+                minX: point.x, minY: point.y, maxX: point.x, maxY: point.y
+            });
+        }
+    });
+
     var CanvasIconLayer = L.Layer.extend({ // todo inherit from L.Renderer or L.Canvas
 
         options: L.Canvas.prototype.options,
 
         initialize: function (options) {
             L.Renderer.prototype.initialize.call(this, options);
-            //_latlngMarkers contains Lat\Long coordinates of all markers in layer.
-            this._latlngMarkers = new rbush();
-            this._latlngMarkers.dirty = 0;
-            this._latlngMarkers.total = 0;
-            //_markers contains Points of markers currently displaying on map
-            this._markers = new rbush();
+            // _pointsIdx contains Points of markers currently displaying on map
+            this._pointsIdx = new PointsIndex();
+            // _latlngsIdx contains Lat\Long coordinates of all markers in layer.
+            this._latlngsIdx = new LatLngsIndex();
         },
 
         onAdd: function () {
@@ -31,7 +102,7 @@ function layerFactory (L) {
 
         _destroyContainer: function () {
             L.Canvas.prototype._destroyContainer.call(this);
-            this._markers.clear();
+            this._pointsIdx.clear();
         },
 
         getEvents: function () { // todo use L.Renderer.prototype.getEvents
@@ -90,46 +161,20 @@ function layerFactory (L) {
                 this._ctx.clip();
             }
             this._drawing = true;
-            var tmp = [];
-            // If we are 10% individual inserts\removals, reconstruct lookup for efficiency
-            if (this._latlngMarkers.dirty / this._latlngMarkers.total >= .1) {
-                this._latlngMarkers.all().forEach(function (el) {
-                    tmp.push(el);
-                });
-                this._latlngMarkers.clear();
-                this._latlngMarkers.load(tmp);
-                this._latlngMarkers.dirty = 0;
-                tmp = [];
-            }
+            this._latlngsIdx.cleanup();
             var mapBounds = this._map.getBounds().pad(this.options.padding);
 
+            var tmp = [];
             // Only re-draw what we are showing on the map.
-            this._latlngMarkers.search({
-                minX: mapBounds.getWest(),
-                minY: mapBounds.getSouth(),
-                maxX: mapBounds.getEast(),
-                maxY: mapBounds.getNorth()
-            }).forEach(function (el) {
+            this._latlngsIdx.searchIn(mapBounds).forEach(function (marker) {
                 // Readjust Point Map
-                var marker = el.marker;
                 if (!marker._map) { marker._map = this._map; } // todo ??implement proper handling in (on)add*/remove*
-
-                var pointPos = this._drawMarker(marker);
-                var iconSize = marker.options.icon.options.iconSize;
-                var adj_x = iconSize[0] / 2;
-                var adj_y = iconSize[1] / 2;
-                tmp.push({
-                    minX: pointPos.x - adj_x,
-                    minY: pointPos.y - adj_y,
-                    maxX: pointPos.x + adj_x,
-                    maxY: pointPos.y + adj_y,
-                    marker: marker
-                });
+                this._drawMarker(marker);
+                tmp.push(marker);
             }, this);
             this._drawing = false;
             // Clear rBush & Bulk Load for performance
-            this._markers.clear();
-            this._markers.load(tmp);
+            this._pointsIdx.clear().load(tmp);
         },
 
         _drawMarker: function (marker) {
@@ -166,7 +211,6 @@ function layerFactory (L) {
             } else if (queued.loaded) { // image may be not loaded / bad url
                 this._drawImage(marker);
             }
-            return marker._point;
         },
 
         _drawImage: function (marker) {
@@ -181,19 +225,12 @@ function layerFactory (L) {
             );
         },
 
-        _searchPoints: function (point) {
-            return this._markers && this._markers.search({
-                minX: point.x, minY: point.y, maxX: point.x, maxY: point.y
-            });
-        },
-
         _onClick: function (e) {
-            var point = e.layerPoint || this._map.mouseEventToLayerPoint(e), layer, clickedLayer;
+            var point = e.layerPoint || this._map.mouseEventToLayerPoint(e), clickedLayer;
 
-            var layer_intersect = this._searchPoints(point);
+            var layer_intersect = this._pointsIdx && this._pointsIdx.searchBy(point);
             if (layer_intersect) {
-                layer_intersect.forEach(function (el) {
-                    layer = el.marker;
+                layer_intersect.forEach(function (layer) {
                     if (layer.options.interactive && !this._map._draggableMoved(layer)) {
                         clickedLayer = layer;
                     }
@@ -213,11 +250,10 @@ function layerFactory (L) {
         },
 
         _handleMouseHover: function (e, point) {
-            var layer, candidateHoveredLayer;
-            var layer_intersect = this._searchPoints(point);
+            var candidateHoveredLayer;
+            var layer_intersect = this._pointsIdx && this._pointsIdx.searchBy(point);
             if (layer_intersect) {
-                layer_intersect.forEach(function (el) {
-                    layer = el.marker;
+                layer_intersect.forEach(function (layer) {
                     if (layer.options.interactive) {
                         candidateHoveredLayer = layer;
                     }
@@ -259,37 +295,18 @@ function layerFactory (L) {
             L.Util.stamp(marker);
             marker.addEventParent(this);
 
-            this._latlngMarkers.dirty++;
-            this._latlngMarkers.total++;
             if (isDisplaying) {
-                var pointPos = this._drawMarker(marker);
-                var iconSize = marker.options.icon.options.iconSize;
-                var adj_x = iconSize[0] / 2;
-                var adj_y = iconSize[1] / 2;
-                var p = {
-                    minX: pointPos.x - adj_x,
-                    minY: pointPos.y - adj_y,
-                    maxX: pointPos.x + adj_x,
-                    maxY: pointPos.y + adj_y,
-                    marker: marker
-                };
+                this._drawMarker(marker);
                 if (points) {
-                    points.push(p);
+                    points.push(marker);
                 } else {
-                    this._markers.insert(p);
+                    this._pointsIdx.insert(marker);
                 }
             }
-            var ll = {
-                minX: latlng.lng,
-                minY: latlng.lat,
-                maxX: latlng.lng,
-                maxY: latlng.lat,
-                marker: marker
-            };
             if (latlngs) {
-                latlngs.push(ll);
+                latlngs.push(marker);
             } else {
-                this._latlngMarkers.insert(ll);
+                this._latlngsIdx.insert(marker);
             }
         },
 
@@ -325,8 +342,8 @@ function layerFactory (L) {
                 this._groupIDs[groupID]++;
                 marker._canvasGroupID = groupID;
             }, this);
-            this._markers.load(tmpMark);
-            this._latlngMarkers.load(tmpLatLng);
+            this._pointsIdx.load(tmpMark);
+            this._latlngsIdx.load(tmpLatLng);
             return this;
         },
 
@@ -352,29 +369,17 @@ function layerFactory (L) {
             groupID = groupID.toString();
             if (!this._groupIDs[groupID]) { return; }
             delete this._groupIDs[groupID];
-            this._latlngMarkers.all().filter(function (el) {
-                return el.marker._canvasGroupID === groupID;
+            this._latlngsIdx.all().filter(function (marker) {
+                return marker._canvasGroupID === groupID;
             }).forEach(function (el) {
-                this._latlngMarkers.remove(el);
-                this._latlngMarkers.total--;
+                this._latlngsIdx.remove(el);
             }, this);
         },
 
         removeMarker: function (marker, redraw) {
             var latlng = marker.getLatLng();
             var isDisplaying = this._map && this._map.getBounds().pad(this.options.padding).contains(latlng);
-            var val = {
-                minX: latlng.lng,
-                minY: latlng.lat,
-                maxX: latlng.lng,
-                maxY: latlng.lat,
-                marker: marker
-            };
-
-            this._latlngMarkers.remove(val, function (a, b) {
-                return a.marker === b.marker;
-            });
-            this._latlngMarkers.total--;
+            this._latlngsIdx.remove(marker);
 
             if (isDisplaying && redraw) {
                 this._redraw();
@@ -396,8 +401,8 @@ function layerFactory (L) {
         },
         */
         clearLayers: function () {
-            this._latlngMarkers.clear();
-            this._markers.clear();
+            this._latlngsIdx.clear();
+            this._pointsIdx.clear();
             this._clear();
             return this;
         }

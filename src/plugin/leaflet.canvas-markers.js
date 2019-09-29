@@ -114,7 +114,7 @@ function layerFactory (L) {
                 var marker = el.marker;
                 if (!marker._map) { marker._map = this._map; } // todo ??implement proper handling in (on)add*/remove*
 
-                var pointPos = this._map.latLngToContainerPoint(marker.getLatLng());
+                var pointPos = this._map.latLngToLayerPoint(marker.getLatLng());
                 this._drawMarker(marker, pointPos);
 
                 var iconSize = marker.options.icon.options.iconSize;
@@ -171,7 +171,7 @@ function layerFactory (L) {
 
         _drawImage: function (marker, pointPos) {
             var options = marker.options.icon.options;
-            var pos = this._map.containerPointToLayerPoint(pointPos.subtract(options.iconAnchor));
+            var pos = pointPos.subtract(options.iconAnchor);
             this._ctx.drawImage(
                 marker.canvas_img,
                 pos.x,
@@ -188,7 +188,7 @@ function layerFactory (L) {
         },
 
         _onClick: function (e) {
-            var point = e.containerPoint || this._map.mouseEventToContainerPoint(e), layer, clickedLayer; // !!L.Canvas uses mouseEventToLayerPoint(e)
+            var point = e.layerPoint || this._map.mouseEventToLayerPoint(e), layer, clickedLayer;
 
             var layer_intersect = this._searchPoints(point);
             if (layer_intersect) {
@@ -208,7 +208,7 @@ function layerFactory (L) {
         _onMouseMove: function (e) {
             if (!this._map || this._map.dragging.moving() || this._map._animatingZoom) { return; }
 
-            var point = e.containerPoint || this._map.mouseEventToContainerPoint(e); // !!L.Canvas uses mouseEventToLayerPoint(e)
+            var point = e.layerPoint || this._map.mouseEventToLayerPoint(e);
             this._handleMouseHover(e, point);
         },
 
@@ -244,7 +244,7 @@ function layerFactory (L) {
         },
 
         _fireEvent: function (layers, e, type) {
-            if (e.containerPoint) {
+            if (e.layerPoint) {
                 layers[0].fire(type || e.type, e, true);
                 return;
             }
@@ -262,7 +262,7 @@ function layerFactory (L) {
             this._latlngMarkers.dirty++;
             this._latlngMarkers.total++;
             if (isDisplaying) {
-                var pointPos = this._map.latLngToContainerPoint(latlng);
+                var pointPos = this._map.latLngToLayerPoint(latlng);
                 this._drawMarker(marker, pointPos);
 
                 var iconSize = marker.options.icon.options.iconSize;

@@ -4,7 +4,6 @@ function layerFactory (L) {
 
     function extend (Parent, props) {
         var NewClass = function () {
-            Parent.apply(this, arguments);
             if (this.init) { this.init.apply(this, arguments); }
         };
         var proto = L.Util.create(Parent.prototype);
@@ -13,7 +12,26 @@ function layerFactory (L) {
         return NewClass;
     }
 
-    var LatLngsIndex = extend(rbush, {
+    var Common = extend(rbush, {
+        init: function () {
+            rbush.apply(this, arguments);
+            this._batch = [];
+        },
+        insert: function (item, batch) {
+            if (batch) {
+                this._batch.push(item);
+                return this;
+            }
+            return rbush.prototype.insert.call(this, item);
+        },
+        flush: function () {
+            this.load(this._batch);
+            this._batch.length = 0;
+            return this;
+        }
+    });
+
+    var LatLngsIndex = extend(Common, {
         toBBox: function (marker) {
             var ll = marker._latlng;
             return {minX: ll.lng, minY: ll.lat, maxX: ll.lng, maxY: ll.lat};
@@ -29,6 +47,7 @@ function layerFactory (L) {
             });
         },
         init: function () {
+            Common.prototype.init.apply(this, arguments);
             this._dirty = 0;
             this._total = 0;
         },
@@ -45,15 +64,20 @@ function layerFactory (L) {
         insert: function () {
             this._dirty++;
             this._total++;
-            return rbush.prototype.insert.apply(this, arguments);
+            return Common.prototype.insert.apply(this, arguments);
         },
-        remove: function (item) {
+        remove: function () {
             this._total--;
-            return rbush.prototype.remove.apply(this, arguments);
+            return Common.prototype.remove.apply(this, arguments);
+        },
+        clear: function () {
+            this._dirty = 0;
+            this._total = 0;
+            return rbush.prototype.clear.apply(this);
         }
     });
 
-    var PointsIndex = extend(rbush, {
+    var PointsIndex = extend(Common, {
         toBBox: function (marker) {
             var iconSize = marker.options.icon.options.iconSize;
             var pos = marker._point;
@@ -164,17 +188,16 @@ function layerFactory (L) {
             this._latlngsIdx.cleanup();
             var mapBounds = this._map.getBounds().pad(this.options.padding);
 
-            var tmp = [];
             // Only re-draw what we are showing on the map.
             this._latlngsIdx.searchIn(mapBounds).forEach(function (marker) {
                 // Readjust Point Map
                 if (!marker._map) { marker._map = this._map; } // todo ??implement proper handling in (on)add*/remove*
                 this._drawMarker(marker);
-                tmp.push(marker);
+                this._pointsIdx.insert(marker,true);
             }, this);
             this._drawing = false;
             // Clear rBush & Bulk Load for performance
-            this._pointsIdx.clear().load(tmp);
+            this._pointsIdx.clear().flush();
         },
 
         _drawMarker: function (marker) {
@@ -287,7 +310,7 @@ function layerFactory (L) {
             L.Canvas.prototype._fireEvent.call(this, layers, e, type);
         },
 
-        _addMarker: function (marker, latlng, isDisplaying, points, latlngs) {
+        _addMarker: function (marker, latlng, isDisplaying, batch) {
             if (!(marker instanceof L.Marker)) {
                 throw new Error("Layer isn't a marker");
             }
@@ -297,17 +320,9 @@ function layerFactory (L) {
 
             if (isDisplaying) {
                 this._drawMarker(marker);
-                if (points) {
-                    points.push(marker);
-                } else {
-                    this._pointsIdx.insert(marker);
-                }
+                this._pointsIdx.insert(marker, batch);
             }
-            if (latlngs) {
-                latlngs.push(marker);
-            } else {
-                this._latlngsIdx.insert(marker);
-            }
+            this._latlngsIdx.insert(marker, batch);
         },
 
         // Adds single layer at a time. Less efficient for rBush
@@ -333,17 +348,16 @@ function layerFactory (L) {
             this._groupIDs = this._groupIDs || {};
             this._groupIDs[groupID] = this._groupIDs[groupID] || 0;
 
-            var tmpMark = [], tmpLatLng = [];
             var mapBounds = this._map && this._map.getBounds().pad(this.options.padding);
             markers.forEach(function (marker) {
                 var latlng = marker.getLatLng();
                 var isDisplaying = mapBounds && mapBounds.contains(latlng);
-                this._addMarker(marker, latlng, isDisplaying, tmpMark, tmpLatLng);
+                this._addMarker(marker, latlng, isDisplaying, true);
                 this._groupIDs[groupID]++;
                 marker._canvasGroupID = groupID;
             }, this);
-            this._pointsIdx.load(tmpMark);
-            this._latlngsIdx.load(tmpLatLng);
+            this._pointsIdx.flush();
+            this._latlngsIdx.flush();
             return this;
         },
 

@@ -114,9 +114,7 @@ function layerFactory (L) {
                 var marker = el.marker;
                 if (!marker._map) { marker._map = this._map; } // todo ??implement proper handling in (on)add*/remove*
 
-                var pointPos = this._map.latLngToLayerPoint(marker.getLatLng());
-                this._drawMarker(marker, pointPos);
-
+                var pointPos = this._drawMarker(marker);
                 var iconSize = marker.options.icon.options.iconSize;
                 var adj_x = iconSize[0] / 2;
                 var adj_y = iconSize[1] / 2;
@@ -134,7 +132,8 @@ function layerFactory (L) {
             this._markers.load(tmp);
         },
 
-        _drawMarker: function (marker, pointPos) {
+        _drawMarker: function (marker) {
+            marker._point = this._map.latLngToLayerPoint(marker.getLatLng());
             this._imageLookup = this._imageLookup || {};
 
             var iconUrl = marker.options.icon.options.iconUrl;
@@ -143,9 +142,9 @@ function layerFactory (L) {
                 if (queued) {
                     marker.canvas_img = queued.img;
                     if (queued.loaded) {
-                        this._drawImage(marker, pointPos);
+                        this._drawImage(marker);
                     } else {
-                        queued.queue.push([marker, pointPos]);
+                        queued.queue.push(marker);
                     }
                 } else {
                     var img = new Image();
@@ -154,24 +153,25 @@ function layerFactory (L) {
                     queued = {
                         loaded: false,
                         img: img,
-                        queue: [[marker, pointPos]]
+                        queue: [marker]
                     };
                     this._imageLookup[iconUrl] = queued;
                     img.onload = function () {
                         queued.loaded = true;
-                        queued.queue.forEach(function (el) {
-                            this._drawImage(el[0], el[1]);
+                        queued.queue.forEach(function (_marker) {
+                            this._drawImage(_marker);
                         }, this);
                     }.bind(this);
                 }
             } else if (queued.loaded) { // image may be not loaded / bad url
-                this._drawImage(marker, pointPos);
+                this._drawImage(marker);
             }
+            return marker._point;
         },
 
-        _drawImage: function (marker, pointPos) {
+        _drawImage: function (marker) {
             var options = marker.options.icon.options;
-            var pos = pointPos.subtract(options.iconAnchor);
+            var pos = marker._point.subtract(options.iconAnchor);
             this._ctx.drawImage(
                 marker.canvas_img,
                 pos.x,
@@ -262,9 +262,7 @@ function layerFactory (L) {
             this._latlngMarkers.dirty++;
             this._latlngMarkers.total++;
             if (isDisplaying) {
-                var pointPos = this._map.latLngToLayerPoint(latlng);
-                this._drawMarker(marker, pointPos);
-
+                var pointPos = this._drawMarker(marker);
                 var iconSize = marker.options.icon.options.iconSize;
                 var adj_x = iconSize[0] / 2;
                 var adj_y = iconSize[1] / 2;

@@ -304,10 +304,11 @@ function layerFactory (L) {
                 this._markers.insert(dat[0]);
             }
             this._latlngMarkers.insert(dat[1]);
+            return this;
         },
 
         addLayer: function (layer, groupID) {
-            this.addMarker(layer,groupID);
+            return this.addMarker(layer,groupID);
         },
 
         // Multiple layers at a time for rBush performance
@@ -332,10 +333,11 @@ function layerFactory (L) {
             }, this);
             this._markers.load(tmpMark);
             this._latlngMarkers.load(tmpLatLng);
+            return this;
         },
 
         addLayers: function (layers, groupID) {
-            this.addMarkers(layers,groupID);
+            return this.addMarkers(layers,groupID);
         },
 
         removeGroups: function (groupIDs) {
@@ -343,11 +345,13 @@ function layerFactory (L) {
                 this._removeGroup(groupID);
             }, this);
             this._redraw();
+            return this;
         },
 
         removeGroup: function (groupID) {
             this._removeGroup(groupID);
             this._redraw();
+            return this;
         },
 
         _removeGroup: function (groupID) {
@@ -382,10 +386,11 @@ function layerFactory (L) {
                 this._redraw();
             }
             marker.removeEventParent(this);
+            return this;
         },
 
         removeLayer: function (layer) {
-            this.removeMarker(layer, true);
+            return this.removeMarker(layer, true);
         },
         /*
         removeLayers: function (layers) {
@@ -393,13 +398,14 @@ function layerFactory (L) {
                 this.removeMarker(el, false);
             }, this);
             this._redraw();
+            return this;
         },
         */
         clearLayers: function () {
             this._latlngMarkers.clear();
             this._markers.clear();
             this._clear();
-            return;
+            return this;
         }
     });
 

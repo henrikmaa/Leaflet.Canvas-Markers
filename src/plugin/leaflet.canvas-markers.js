@@ -6,6 +6,12 @@ function layerFactory(L) {
         initialize: function (options) {
             L.Util.setOptions(this, options);
             L.Util.stamp(this);
+            //_latlngMarkers contains Lat\Long coordinates of all markers in layer.
+            this._latlngMarkers = new rbush();
+            this._latlngMarkers.dirty = 0;
+            this._latlngMarkers.total = 0;
+            //_markers contains Points of markers currently displaying on map
+            this._markers = new rbush();
         },
         onAdd: function () {
             if (!this._container) {
@@ -102,10 +108,9 @@ function layerFactory(L) {
             this._redrawBounds = null;
         },
         _destroyContainer: function () {
-            delete this._markers;
-            delete this._latlngMarkers;
-            delete this._ctx;
+            this._markers.clear();
             this._container.remove();
+            delete this._ctx;
             delete this._container;
         },
         _update: function () {
@@ -150,9 +155,6 @@ function layerFactory(L) {
         },
         _draw: function () {
             var self = this;
-            //If no markers don't draw
-            if (!self._latlngMarkers)
-                return;
 
             var bounds = self._redrawBounds;
             if (bounds) {
@@ -503,16 +505,6 @@ function layerFactory(L) {
             //Needed for pop-up & tooltip to work.
             if (self._map)
                 marker._map = self._map;
-
-            //_markers contains Points of markers currently displaying on map
-            if (!self._markers) self._markers = new rbush();
-
-            //_latlngMarkers contains Lat\Long coordinates of all markers in layer.
-            if (!self._latlngMarkers) {
-                self._latlngMarkers = new rbush();
-                self._latlngMarkers.dirty = 0;
-                self._latlngMarkers.total = 0;
-            }
 
             L.Util.stamp(marker);
             marker.addEventParent(self);

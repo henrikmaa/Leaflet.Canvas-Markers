@@ -18,7 +18,7 @@ function layerFactory(L) {
 
         onAdd: function () {
             L.Renderer.prototype.onAdd.call(this);
-            // L.DomUtil.toBack(this._container);
+            L.DomUtil.toBack(this._container);
         },
 
         onRemove: function () {
@@ -31,7 +31,10 @@ function layerFactory(L) {
             var events = {
                 viewreset: this._reset,
                 zoom: this._onZoom,
-                moveend: this._update
+                moveend: this._update,
+                click: this._onClick,
+                mousemove: this._onMouseMove,
+                mouseout: this._handleMouseOut
             };
             if (this._zoomAnimated) {
                 events.zoomanim = this._onAnimZoom;
@@ -191,7 +194,7 @@ function layerFactory(L) {
         },
 
         _onClick: function (e) {
-            var point = this._map.mouseEventToContainerPoint(e), layer, clickedLayer; // !!L.Canvas uses mouseEventToLayerPoint(e)
+            var point = e.containerPoint || this._map.mouseEventToContainerPoint(e), layer, clickedLayer; // !!L.Canvas uses mouseEventToLayerPoint(e)
 
             var layer_intersect = this._searchPoints(point);
             if (layer_intersect) {
@@ -211,7 +214,7 @@ function layerFactory(L) {
         _onMouseMove: function (e) {
             if (!this._map || this._map.dragging.moving() || this._map._animatingZoom) { return; }
 
-            var point = this._map.mouseEventToContainerPoint(e); // !!L.Canvas uses mouseEventToLayerPoint(e)
+            var point = e.containerPoint || this._map.mouseEventToContainerPoint(e); // !!L.Canvas uses mouseEventToLayerPoint(e)
             this._handleMouseHover(e, point);
         },
 
@@ -247,6 +250,10 @@ function layerFactory(L) {
         },
 
         _fireEvent: function (layers, e, type) {
+            if (e.containerPoint) {
+                layers[0].fire(type || e.type, e, true);
+                return;
+            }
             L.Canvas.prototype._fireEvent.call(this, layers, e, type);
         },
 

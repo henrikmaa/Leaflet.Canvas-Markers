@@ -153,7 +153,9 @@ function layerFactory (L) {
         },
 
         _updateTransform: function (center, zoom) {
-            L.Renderer.prototype._updateTransform.call(this, center, zoom);
+            // Skipping animations for layers that do not contain elements
+            if (this._latlngsIdx._total)
+                L.Renderer.prototype._updateTransform.call(this, center, zoom);
         },
 
         _updatePaths: L.Util.falseFn, // stub for L.Renderer onAdd/onRemove

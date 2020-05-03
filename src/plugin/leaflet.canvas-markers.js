@@ -118,6 +118,7 @@ function layerFactory (L) {
 
         _initContainer: function () {
             L.Canvas.prototype._initContainer.call(this);
+            this._hideContainer(true);
         },
 
         onRemove: function () {
@@ -189,15 +190,18 @@ function layerFactory (L) {
             var mapBounds = this._map.getBounds().pad(this.options.padding);
 
             // Only re-draw what we are showing on the map.
+            var isEmpty = true;
             this._latlngsIdx.searchIn(mapBounds).forEach(function (marker) {
                 // Readjust Point Map
                 if (!marker._map) { marker._map = this._map; } // todo ??implement proper handling in (on)add*/remove*
                 this._drawMarker(marker);
                 this._pointsIdx.insert(marker,true);
+                isEmpty = false;
             }, this);
             this._drawing = false;
             // Clear rBush & Bulk Load for performance
             this._pointsIdx.clear().flush();
+            this._hideContainer(isEmpty);
         },
 
         _drawMarker: function (marker) {
@@ -329,6 +333,7 @@ function layerFactory (L) {
             if (isDisplaying) {
                 this._drawMarker(marker);
                 this._pointsIdx.insert(marker, batch);
+                this._hideContainer(false);
             }
             this._latlngsIdx.insert(marker, batch);
         },
@@ -427,6 +432,12 @@ function layerFactory (L) {
             this._pointsIdx.clear();
             this._clear();
             return this;
+        },
+
+        _hideContainer: function (hide) {
+            if (this._isEmpty === hide) { return; }
+            this._isEmpty = hide;
+            this._container.style.display = hide ? 'none' : 'initial';
         }
     });
 

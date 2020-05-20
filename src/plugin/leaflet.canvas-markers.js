@@ -231,7 +231,9 @@ function layerFactory (L) {
                     img.onload = function () {
                         queued.loaded = true;
                         queued.queue.forEach(function (_marker) {
-                            this._drawImage(_marker);
+                            if (this.hasLayer(_marker)) {
+                                this._drawImage(_marker);
+                            }
                         }, this);
                     }.bind(this);
                 }
@@ -399,16 +401,16 @@ function layerFactory (L) {
             this._latlngsIdx.all().filter(function (marker) {
                 return marker._canvasGroupID === groupID;
             }).forEach(function (el) {
-                this._latlngsIdx.remove(el);
+                this.removeMarker(el, false, true);
             }, this);
         },
 
-        removeMarker: function (marker, redraw) {
-            var latlng = marker.getLatLng();
-            var isDisplaying = this._map && this._map.getBounds().pad(this.options.padding).contains(latlng);
+        removeMarker: function (marker, redraw, hasLayer) {
+            if (!hasLayer && !this.hasLayer(marker)) { return; }
             this._latlngsIdx.remove(marker);
 
-            if (isDisplaying && redraw) {
+            if (redraw && this._map &&
+                  this._map.getBounds().pad(this.options.padding).contains(marker.getLatLng())) {
                 this._redraw();
             }
             marker.removeEventParent(this);
@@ -432,6 +434,11 @@ function layerFactory (L) {
             this._pointsIdx.clear();
             this._clear();
             return this;
+        },
+
+        hasLayer: function (layer) {
+            // return this._latlngsIdx.all().indexOf(layer) !== -1;
+            return layer._eventParents[L.Util.stamp(this)]; // !! to cut corners
         },
 
         _hideContainer: function (hide) {
